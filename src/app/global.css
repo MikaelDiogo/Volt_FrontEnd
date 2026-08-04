@@ -1,0 +1,108 @@
+:root,
+[data-mantine-color-scheme="dark"] {
+  --bg: #0b0d0c;
+  --bg-sidebar: #0f110d;
+  --bg-panel: #12140f;
+  --bg-panel-alt: #0f110d;
+  --text: #eef2ee;
+  --text-secondary: #a9b3ac;
+  --text-muted: #7d8880;
+  --text-muted-dark: #5f6a62;
+  --accent: #4c7dff;
+  --accent-hover: #7aa0ff;
+  --danger: #ff7a5c;
+  --warning: #ffbd2e;
+  --success: #3fdb5a;
+  --success-alt: #7aa0ff;
+  --info: #7aa9ff;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-panel: rgba(255, 255, 255, 0.07);
+  --border-input: rgba(255, 255, 255, 0.08);
+  --border-emphasis: rgba(255, 255, 255, 0.1);
+  --radius-sm: 8px;
+  --radius-lg: 14px;
+  --radius-chip: 6px;
+  --radius-pill: 100px;
+  --font-heading: "Space Grotesk", sans-serif;
+  --font-body: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+[data-mantine-color-scheme="light"] {
+  --bg: #eef0ec;
+  --bg-sidebar: #f4f5f1;
+  --bg-panel: #f4f5f1;
+  --bg-panel-alt: #e7e9e3;
+  --text: #10120f;
+  --text-secondary: #4a534c;
+  --text-muted: #6b746c;
+  --text-muted-dark: #8b948c;
+  --accent: #2f5bf0;
+  --accent-hover: #1c46d1;
+  --danger: #d9482c;
+  --warning: #b17400;
+  --success: #1e9e3d;
+  --success-alt: #1c46d1;
+  --info: #3868c9;
+  --border-subtle: rgba(0, 0, 0, 0.07);
+  --border-panel: rgba(0, 0, 0, 0.09);
+  --border-input: rgba(0, 0, 0, 0.12);
+  --border-emphasis: rgba(0, 0, 0, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+a {
+  color: var(--accent);
+}
+
+/* Global scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #262a24;
+  border-radius: 4px;
+}
+
+[data-mantine-color-scheme="light"] ::-webkit-scrollbar-thumb {
+  background: #d4d8d1;
+}
+
+.rn-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.rn-scrollbar::-webkit-scrollbar-thumb {
+  background: #262a24;
+  border-radius: 4px;
+}
+
+[data-mantine-color-scheme="light"] .rn-scrollbar::-webkit-scrollbar-thumb {
+  background: #d4d8d1;
+}
