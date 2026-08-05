@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { Stack, Group, Button, Modal, TextInput, Badge } from "@mantine/core";
+import { Stack, Group, Button, Modal, TextInput, Badge, ActionIcon } from "@mantine/core";
+import { IconTrash } from "@tabler/icons-react";
+import { modals } from "@mantine/modals";
+import { notifications } from "@mantine/notifications";
 import { DataTable, type DataTableColumn } from "@/shared/components/DataTable";
-import { useDeviceCategoriesList, useCreateDeviceCategory } from "../hooks/useDeviceCategories";
+import { useDeviceCategoriesList, useCreateDeviceCategory, useDeleteDeviceCategory } from "../hooks/useDeviceCategories";
 import { DeviceCategoryForm } from "./DeviceCategoryForm";
 import type { DeviceCategory } from "../types/device-category.types";
 
@@ -11,6 +14,33 @@ export function CategoriesTab() {
 
   const { data, isLoading } = useDeviceCategoriesList();
   const createMutation = useCreateDeviceCategory();
+  const deleteMutation = useDeleteDeviceCategory();
+
+  function handleDelete(category: DeviceCategory) {
+    modals.openConfirmModal({
+      title: "Excluir categoria",
+      children: `Tem certeza que deseja excluir esta categoria (${category.name})?`,
+      labels: { confirm: "Excluir", cancel: "Cancelar" },
+      confirmProps: { color: "danger" },
+      onConfirm: () => {
+        deleteMutation.mutate(category.id, {
+          onSuccess: () => {
+            notifications.show({
+              color: "accent",
+              title: "Categoria excluída",
+              message: "Categoria excluída com sucesso.",
+            });
+          },
+          onError: (error: unknown) => {
+            const message =
+              (error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+              "Não foi possível excluir a categoria.";
+            notifications.show({ color: "danger", title: "Erro", message: String(message) });
+          },
+        });
+      },
+    });
+  }
 
   const categories = (data ?? []).filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()),
@@ -25,6 +55,20 @@ export function CategoriesTab() {
         <Badge color={row.hasImei ? "accent" : "gray"} variant={row.hasImei ? "filled" : "outline"}>
           {row.hasImei ? "Sim" : "Não"}
         </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Ações",
+      render: (row) => (
+        <ActionIcon
+          color="danger"
+          variant="subtle"
+          onClick={() => handleDelete(row)}
+          loading={deleteMutation.isPending && deleteMutation.variables === row.id}
+        >
+          <IconTrash size={16} />
+        </ActionIcon>
       ),
     },
   ];

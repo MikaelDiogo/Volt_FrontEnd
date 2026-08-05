@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Text, Modal, Stack, Group, Textarea, Button, Checkbox, Divider } from "@mantine/core";
+import { Text, Modal, Stack, Group, Textarea, Button, Checkbox, Divider, ActionIcon } from "@mantine/core";
+import { IconTrash } from "@tabler/icons-react";
+import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
 import { Panel } from "@/shared/components/Panel";
 import { ServiceOrderStatusBadge } from "../components/ServiceOrderStatusBadge";
-import { useServiceOrdersList, useUpdateServiceOrder } from "../hooks/useServiceOrders";
+import { useServiceOrdersList, useUpdateServiceOrder, useDeleteServiceOrder } from "../hooks/useServiceOrders";
 import { ServiceOrderStatus, type ServiceOrder } from "../types/service-order.types";
 import { formatCurrencyBRL, formatImei, formatDate } from "@/shared/utils/formatters";
 
@@ -55,6 +57,7 @@ function KanbanCard({
 
 function OrderDetailModal({ order, onClose }: { order: ServiceOrder; onClose: () => void }) {
   const updateMutation = useUpdateServiceOrder();
+  const deleteMutation = useDeleteServiceOrder();
   const [notes, setNotes] = useState(order.internalNotes ?? "");
 
   function handleSaveNotes() {
@@ -71,6 +74,35 @@ function OrderDetailModal({ order, onClose }: { order: ServiceOrder; onClose: ()
     );
   }
 
+  function handleDelete() {
+    modals.openConfirmModal({
+      title: "Excluir ordem de serviço",
+      children: `Tem certeza que deseja excluir esta ordem de serviço (${
+        order.protocolNumber ?? order.deviceModel
+      })?`,
+      labels: { confirm: "Excluir", cancel: "Cancelar" },
+      confirmProps: { color: "danger" },
+      onConfirm: () => {
+        deleteMutation.mutate(order.id, {
+          onSuccess: () => {
+            notifications.show({
+              color: "accent",
+              title: "Ordem de serviço excluída",
+              message: "Ordem de serviço excluída com sucesso.",
+            });
+            onClose();
+          },
+          onError: (error: unknown) => {
+            const message =
+              (error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+              "Não foi possível excluir a ordem de serviço.";
+            notifications.show({ color: "danger", title: "Erro", message: String(message) });
+          },
+        });
+      },
+    });
+  }
+
   return (
     <Modal opened onClose={onClose} title={order.protocolNumber ?? `O.S. #${order.id.slice(0, 8).toUpperCase()}`} size="lg">
       <Stack gap="sm">
@@ -78,7 +110,12 @@ function OrderDetailModal({ order, onClose }: { order: ServiceOrder; onClose: ()
           <Text style={{ fontSize: 13 }}>
             <b>Cliente:</b> {order.customerName}
           </Text>
-          <ServiceOrderStatusBadge status={order.status} />
+          <Group gap={8}>
+            <ServiceOrderStatusBadge status={order.status} />
+            <ActionIcon color="danger" variant="subtle" onClick={handleDelete} loading={deleteMutation.isPending}>
+              <IconTrash size={16} />
+            </ActionIcon>
+          </Group>
         </Group>
         <Text style={{ fontSize: 13 }}>
           <b>Categoria:</b> {order.deviceCategory}

@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { Stack, Group, Button, Modal, TextInput } from "@mantine/core";
+import { Stack, Group, Button, Modal, TextInput, ActionIcon } from "@mantine/core";
+import { IconTrash } from "@tabler/icons-react";
+import { modals } from "@mantine/modals";
+import { notifications } from "@mantine/notifications";
 import { DataTable, type DataTableColumn } from "@/shared/components/DataTable";
 import { usePagination } from "@/shared/hooks/usePagination";
 import { formatCurrencyBRL } from "@/shared/utils/formatters";
-import { useProductsList, useCreateProduct } from "../hooks/useProducts";
+import { useProductsList, useCreateProduct, useDeleteProduct } from "../hooks/useProducts";
 import { ProductForm } from "./ProductForm";
 import type { Product } from "../types/product.types";
 
@@ -14,6 +17,33 @@ export function ProductsTab() {
 
   const { data, isLoading } = useProductsList({ page, perPage, search: search || undefined });
   const createMutation = useCreateProduct();
+  const deleteMutation = useDeleteProduct();
+
+  function handleDelete(product: Product) {
+    modals.openConfirmModal({
+      title: "Excluir produto",
+      children: `Tem certeza que deseja excluir este produto (${product.name})?`,
+      labels: { confirm: "Excluir", cancel: "Cancelar" },
+      confirmProps: { color: "danger" },
+      onConfirm: () => {
+        deleteMutation.mutate(product.id, {
+          onSuccess: () => {
+            notifications.show({
+              color: "accent",
+              title: "Produto excluído",
+              message: "Produto excluído com sucesso.",
+            });
+          },
+          onError: (error: unknown) => {
+            const message =
+              (error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+              "Não foi possível excluir o produto.";
+            notifications.show({ color: "danger", title: "Erro", message: String(message) });
+          },
+        });
+      },
+    });
+  }
 
   const columns: DataTableColumn<Product>[] = [
     { key: "name", header: "Produto" },
@@ -37,6 +67,20 @@ export function ProductsTab() {
         >
           {row.quantity}
         </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Ações",
+      render: (row) => (
+        <ActionIcon
+          color="danger"
+          variant="subtle"
+          onClick={() => handleDelete(row)}
+          loading={deleteMutation.isPending && deleteMutation.variables === row.id}
+        >
+          <IconTrash size={16} />
+        </ActionIcon>
       ),
     },
   ];

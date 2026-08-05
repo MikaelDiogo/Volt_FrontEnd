@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { Stack, Group, Button, Modal, TextInput, Select } from "@mantine/core";
+import { Stack, Group, Button, Modal, TextInput, Select, ActionIcon } from "@mantine/core";
+import { IconTrash } from "@tabler/icons-react";
+import { modals } from "@mantine/modals";
+import { notifications } from "@mantine/notifications";
 import { DataTable, type DataTableColumn } from "@/shared/components/DataTable";
 import { usePagination } from "@/shared/hooks/usePagination";
 import { formatImei } from "@/shared/utils/formatters";
-import { useDevicesList, useCreateDevice, useUpdateDevice } from "../hooks/useDevices";
+import { useDevicesList, useCreateDevice, useUpdateDevice, useDeleteDevice } from "../hooks/useDevices";
 import { DeviceForm } from "./DeviceForm";
 import { DeviceStatus, type Device } from "../types/device.types";
 
@@ -46,6 +49,33 @@ export function DevicesTab() {
 
   const { data, isLoading } = useDevicesList({ page, perPage, search: search || undefined });
   const createMutation = useCreateDevice();
+  const deleteMutation = useDeleteDevice();
+
+  function handleDelete(device: Device) {
+    modals.openConfirmModal({
+      title: "Excluir aparelho",
+      children: `Tem certeza que deseja excluir este aparelho (${device.model})?`,
+      labels: { confirm: "Excluir", cancel: "Cancelar" },
+      confirmProps: { color: "danger" },
+      onConfirm: () => {
+        deleteMutation.mutate(device.id, {
+          onSuccess: () => {
+            notifications.show({
+              color: "accent",
+              title: "Aparelho excluído",
+              message: "Aparelho excluído com sucesso.",
+            });
+          },
+          onError: (error: unknown) => {
+            const message =
+              (error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+              "Não foi possível excluir o aparelho.";
+            notifications.show({ color: "danger", title: "Erro", message: String(message) });
+          },
+        });
+      },
+    });
+  }
 
   const columns: DataTableColumn<Device>[] = [
     { key: "model", header: "Produto" },
@@ -58,6 +88,20 @@ export function DevicesTab() {
       ),
     },
     { key: "status", header: "Status", render: (row) => <DeviceStatusSelect device={row} /> },
+    {
+      key: "actions",
+      header: "Ações",
+      render: (row) => (
+        <ActionIcon
+          color="danger"
+          variant="subtle"
+          onClick={() => handleDelete(row)}
+          loading={deleteMutation.isPending && deleteMutation.variables === row.id}
+        >
+          <IconTrash size={16} />
+        </ActionIcon>
+      ),
+    },
   ];
 
   return (
