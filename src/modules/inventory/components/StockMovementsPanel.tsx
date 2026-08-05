@@ -8,8 +8,8 @@ import { useDeviceCategoriesList } from "../hooks/useDeviceCategories";
 
 const inputStyle: CSSProperties = {
   width: 64,
-  backgroundColor: "#0f110d",
-  border: "1px solid rgba(255,255,255,0.1)",
+  backgroundColor: "var(--bg-panel-alt)",
+  border: "1px solid var(--border-input)",
   borderRadius: 6,
   color: "var(--text)",
   fontFamily: "var(--font-mono)",
@@ -120,7 +120,7 @@ export function StockMovementsPanel() {
           fontFamily: "var(--font-mono)",
           color: "var(--text-muted-dark)",
           paddingBottom: 8,
-          borderBottom: "1px solid rgba(255,255,255,0.05)",
+          borderBottom: "1px solid var(--border-subtle)",
         }}
       >
         <span>PEÇA</span>
@@ -147,7 +147,7 @@ export function StockMovementsPanel() {
                 gap: 8,
                 alignItems: "center",
                 padding: "10px 0",
-                borderBottom: index === products.length - 1 ? "none" : "1px solid rgba(255,255,255,0.05)",
+                borderBottom: index === products.length - 1 ? "none" : "1px solid var(--border-subtle)",
               }}
             >
               <Text style={{ fontSize: 13 }}>{product.name}</Text>
