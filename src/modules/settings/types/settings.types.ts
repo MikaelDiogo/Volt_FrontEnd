@@ -5,6 +5,11 @@ export interface CompanySettings {
   logoUrl: string | null;
 }
 
+export interface TelegramLinkCode {
+  code: string;
+  expiresAt: string;
+}
+
 export interface WarrantyTerm {
   id: string;
   name: string;
