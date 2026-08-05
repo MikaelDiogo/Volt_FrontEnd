@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Group, Button, Modal, TextInput } from "@mantine/core";
+import { Group, Button, Modal, TextInput, ActionIcon } from "@mantine/core";
+import { IconEye, IconPencil } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { DataTable, type DataTableColumn } from "@/shared/components/DataTable";
 import { usePagination } from "@/shared/hooks/usePagination";
 import { formatImei, formatCurrencyBRL } from "@/shared/utils/formatters";
-import { useServiceOrdersList, useCreateServiceOrder } from "../hooks/useServiceOrders";
+import { useServiceOrdersList, useCreateServiceOrder, useUpdateServiceOrder } from "../hooks/useServiceOrders";
 import { ServiceOrderStatusBadge } from "../components/ServiceOrderStatusBadge";
 import { ServiceOrderForm } from "../components/ServiceOrderForm";
 import { ServiceOrderStatus } from "../types/service-order.types";
@@ -30,6 +31,7 @@ export default function ServiceOrdersPage() {
   const { page, perPage, setPage } = usePagination();
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<ServiceOrder | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>("Todas");
 
   const activeStatus = STATUS_FILTERS.find((f) => f.label === activeFilter)?.status;
@@ -41,6 +43,7 @@ export default function ServiceOrdersPage() {
     status: activeStatus,
   });
   const createMutation = useCreateServiceOrder();
+  const updateMutation = useUpdateServiceOrder();
 
   const columns: DataTableColumn<ServiceOrder>[] = [
     {
@@ -81,6 +84,30 @@ export default function ServiceOrdersPage() {
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5 }}>
           {formatCurrencyBRL(row.estimatedCost ?? 0)}
         </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Ações",
+      render: (row) => (
+        <Group gap={4}>
+          <ActionIcon
+            color="gray"
+            variant="subtle"
+            aria-label="Visualizar"
+            onClick={() => navigate(`/ordens-servico/${row.id}`)}
+          >
+            <IconEye size={16} />
+          </ActionIcon>
+          <ActionIcon
+            color="accent"
+            variant="subtle"
+            aria-label="Editar"
+            onClick={() => setEditingOrder(row)}
+          >
+            <IconPencil size={16} />
+          </ActionIcon>
+        </Group>
       ),
     },
   ];
@@ -159,6 +186,49 @@ export default function ServiceOrdersPage() {
             });
           }}
         />
+      </Modal>
+
+      <Modal
+        opened={Boolean(editingOrder)}
+        onClose={() => setEditingOrder(null)}
+        title="Editar Ordem de Serviço"
+        size="lg"
+      >
+        {editingOrder && (
+          <ServiceOrderForm
+            submitting={updateMutation.isPending}
+            initialValues={{
+              deviceId: editingOrder.deviceId,
+              reportedIssue: editingOrder.reportedIssue,
+              checklist: editingOrder.checklist.map((c) => ({ item: c.label, checked: c.checked })),
+              estimatedDeliveryDate: editingOrder.estimatedDeliveryDate ?? undefined,
+              estimatedCost: editingOrder.estimatedCost ?? undefined,
+              recipientName: editingOrder.recipientName ?? "",
+              recipientPhone: editingOrder.recipientPhone ?? "",
+            }}
+            onSubmit={(values) => {
+              updateMutation.mutate(
+                { id: editingOrder.id, dto: values },
+                {
+                  onSuccess: () => {
+                    setEditingOrder(null);
+                    notifications.show({
+                      color: "accent",
+                      title: "Ordem de serviço atualizada",
+                      message: "As alterações foram salvas com sucesso.",
+                    });
+                  },
+                  onError: (error: unknown) => {
+                    const message =
+                      (error as { response?: { data?: { message?: string } } })?.response?.data
+                        ?.message ?? "Não foi possível atualizar a ordem de serviço.";
+                    notifications.show({ color: "danger", title: "Erro", message: String(message) });
+                  },
+                },
+              );
+            }}
+          />
+        )}
       </Modal>
     </div>
   );

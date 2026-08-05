@@ -15,6 +15,7 @@ export interface ServiceOrder {
   id: string;
   customerId: string | null;
   customerName: string;
+  deviceId: string;
   deviceCategory: string;
   deviceIdentifier: string; // IMEI or serial number
   deviceModel: string;
@@ -45,8 +46,14 @@ export interface CreateServiceOrderDto {
 export interface UpdateServiceOrderDto {
   status?: ServiceOrderStatus;
   technicalReport?: string;
-  checklist?: ChecklistItem[];
+  checklist?: { item: string; checked: boolean }[];
   internalNotes?: string;
+  deviceId?: string;
+  reportedIssue?: string;
+  estimatedDeliveryDate?: string;
+  estimatedCost?: number;
+  recipientName?: string;
+  recipientPhone?: string;
 }
 
 export interface ListServiceOrdersParams {

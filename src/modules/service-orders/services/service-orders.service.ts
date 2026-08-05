@@ -26,8 +26,8 @@ export const serviceOrdersService = {
   },
 
   async update(id: string, dto: UpdateServiceOrderDto): Promise<ServiceOrder> {
-    // The backend has no generic PATCH /service-orders/:id — each field is
-    // saved through its own dedicated sub-route, so route accordingly.
+    // Status/report/notes are still saved through their own dedicated
+    // sub-routes; every other field goes through the generic PATCH /:id.
     let result: ServiceOrder | null = null;
 
     if (dto.status !== undefined) {
@@ -48,6 +48,12 @@ export const serviceOrdersService = {
       const { data } = await axiosInstance.patch<ServiceOrder>(`${BASE_URL}/${id}/notes`, {
         internalNotes: dto.internalNotes,
       });
+      result = data;
+    }
+
+    const { status, technicalReport, internalNotes, ...rest } = dto;
+    if (Object.keys(rest).length > 0) {
+      const { data } = await axiosInstance.patch<ServiceOrder>(`${BASE_URL}/${id}`, rest);
       result = data;
     }
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Stack, Group, Button, Modal, TextInput, Select, ActionIcon } from "@mantine/core";
-import { IconTrash } from "@tabler/icons-react";
+import { IconTrash, IconPencil, IconEye } from "@tabler/icons-react";
 import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
 import { DataTable, type DataTableColumn } from "@/shared/components/DataTable";
@@ -46,9 +46,12 @@ export function DevicesTab() {
   const { page, perPage, setPage } = usePagination();
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const [viewingDevice, setViewingDevice] = useState<Device | null>(null);
 
   const { data, isLoading } = useDevicesList({ page, perPage, search: search || undefined });
   const createMutation = useCreateDevice();
+  const updateMutation = useUpdateDevice();
   const deleteMutation = useDeleteDevice();
 
   function handleDelete(device: Device) {
@@ -92,14 +95,22 @@ export function DevicesTab() {
       key: "actions",
       header: "Ações",
       render: (row) => (
-        <ActionIcon
-          color="danger"
-          variant="subtle"
-          onClick={() => handleDelete(row)}
-          loading={deleteMutation.isPending && deleteMutation.variables === row.id}
-        >
-          <IconTrash size={16} />
-        </ActionIcon>
+        <Group gap={4}>
+          <ActionIcon color="gray" variant="subtle" onClick={() => setViewingDevice(row)}>
+            <IconEye size={16} />
+          </ActionIcon>
+          <ActionIcon color="accent" variant="subtle" onClick={() => setEditingDevice(row)}>
+            <IconPencil size={16} />
+          </ActionIcon>
+          <ActionIcon
+            color="danger"
+            variant="subtle"
+            onClick={() => handleDelete(row)}
+            loading={deleteMutation.isPending && deleteMutation.variables === row.id}
+          >
+            <IconTrash size={16} />
+          </ActionIcon>
+        </Group>
       ),
     },
   ];
@@ -131,6 +142,59 @@ export function DevicesTab() {
           submitting={createMutation.isPending}
           onSubmit={(values) => createMutation.mutate(values, { onSuccess: () => setModalOpen(false) })}
         />
+      </Modal>
+
+      <Modal opened={Boolean(editingDevice)} onClose={() => setEditingDevice(null)} title="Editar aparelho">
+        {editingDevice && (
+          <DeviceForm
+            submitting={updateMutation.isPending}
+            initialValues={{
+              uniqueIdentifier: editingDevice.uniqueIdentifier,
+              model: editingDevice.model,
+              deviceCategoryId: editingDevice.deviceCategoryId,
+              status: editingDevice.status,
+            }}
+            onSubmit={(values) =>
+              updateMutation.mutate(
+                {
+                  id: editingDevice.id,
+                  dto: { model: values.model, status: values.status },
+                },
+                {
+                  onSuccess: () => {
+                    setEditingDevice(null);
+                    notifications.show({
+                      color: "accent",
+                      title: "Aparelho atualizado",
+                      message: "Aparelho atualizado com sucesso.",
+                    });
+                  },
+                  onError: (error: unknown) => {
+                    const message =
+                      (error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+                      "Não foi possível atualizar o aparelho.";
+                    notifications.show({ color: "danger", title: "Erro", message: String(message) });
+                  },
+                },
+              )
+            }
+          />
+        )}
+      </Modal>
+
+      <Modal opened={Boolean(viewingDevice)} onClose={() => setViewingDevice(null)} title="Detalhes do aparelho">
+        {viewingDevice && (
+          <DeviceForm
+            readOnly
+            initialValues={{
+              uniqueIdentifier: viewingDevice.uniqueIdentifier,
+              model: viewingDevice.model,
+              deviceCategoryId: viewingDevice.deviceCategoryId,
+              status: viewingDevice.status,
+            }}
+            onSubmit={() => {}}
+          />
+        )}
       </Modal>
     </Stack>
   );

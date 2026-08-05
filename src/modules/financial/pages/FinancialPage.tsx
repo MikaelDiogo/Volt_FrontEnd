@@ -1,45 +1,173 @@
-import { SimpleGrid, Text } from "@mantine/core";
+import { useState } from "react";
+import { SimpleGrid, Text, Group, Button, Modal, ActionIcon, Badge } from "@mantine/core";
+import { IconEye, IconPencil, IconTrash, IconCheck } from "@tabler/icons-react";
+import { modals } from "@mantine/modals";
+import { notifications } from "@mantine/notifications";
 import { Panel } from "@/shared/components/Panel";
-import { useFinancialTransactionsList } from "../hooks/useFinancialTransactions";
-import { useProductsList } from "@/modules/inventory/hooks/useProducts";
+import { DataTable, type DataTableColumn } from "@/shared/components/DataTable";
+import { usePagination } from "@/shared/hooks/usePagination";
 import { formatCurrencyBRL, formatDate } from "@/shared/utils/formatters";
+import {
+  useFinancialTransactionsList,
+  useCreateFinancialTransaction,
+  useUpdateFinancialTransaction,
+  useDeleteFinancialTransaction,
+  useMarkPaidFinancialTransaction,
+} from "../hooks/useFinancialTransactions";
+import { FinancialTransactionForm } from "../components/FinancialTransactionForm";
+import type { FinancialTransaction } from "../types/financial.types";
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  return message ? String(message) : fallback;
+}
 
 export default function FinancialPage() {
-  const { data } = useFinancialTransactionsList({ page: 1, perPage: 50 });
-  const { data: productsData } = useProductsList({ page: 1, perPage: 10 });
+  const { page, perPage, setPage } = usePagination();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<FinancialTransaction | null>(null);
+  const [viewingTransaction, setViewingTransaction] = useState<FinancialTransaction | null>(null);
+
+  const { data, isLoading } = useFinancialTransactionsList({ page, perPage });
+  const createMutation = useCreateFinancialTransaction();
+  const updateMutation = useUpdateFinancialTransaction();
+  const deleteMutation = useDeleteFinancialTransaction();
+  const markPaidMutation = useMarkPaidFinancialTransaction();
 
   const transactions = data?.data ?? [];
   const entradas = transactions
-    .filter((t) => t.type === "RECEIVABLE" && t.paid)
+    .filter((t) => t.type === "receivable" && Boolean(t.paidAt))
     .reduce((sum, t) => sum + t.amount, 0);
   const saidas = transactions
-    .filter((t) => t.type === "PAYABLE" && t.paid)
+    .filter((t) => t.type === "payable" && Boolean(t.paidAt))
     .reduce((sum, t) => sum + t.amount, 0);
   const saldo = entradas - saidas;
 
-  const payables = transactions.filter((t) => t.type === "PAYABLE" && !t.paid);
-  const receivables = transactions.filter((t) => t.type === "RECEIVABLE" && !t.paid);
+  function handleDelete(transaction: FinancialTransaction) {
+    modals.openConfirmModal({
+      title: "Excluir transação",
+      children: `Tem certeza que deseja excluir esta transação de ${formatCurrencyBRL(transaction.amount)}?`,
+      labels: { confirm: "Excluir", cancel: "Cancelar" },
+      confirmProps: { color: "danger" },
+      onConfirm: () => {
+        deleteMutation.mutate(transaction.id, {
+          onSuccess: () => {
+            notifications.show({
+              color: "accent",
+              title: "Transação excluída",
+              message: "Transação excluída com sucesso.",
+            });
+          },
+          onError: (error: unknown) => {
+            notifications.show({
+              color: "danger",
+              title: "Erro",
+              message: getErrorMessage(error, "Não foi possível excluir a transação."),
+            });
+          },
+        });
+      },
+    });
+  }
 
-  // Representative "peças consumidas" costing, derived from the parts also
-  // shown in the inventory module's stock movements panel.
-  const consumedParts = (productsData?.data ?? []).slice(0, 4).map((product, index) => {
-    const unitsUsed = [3, 5, 2, 4][index] ?? 1;
-    const unitCost = product.costPrice ?? 0;
-    return {
-      id: product.id,
-      name: product.name,
-      unitsUsed,
-      unitCost,
-      totalCost: unitsUsed * unitCost,
-    };
-  });
+  function handleMarkPaid(transaction: FinancialTransaction) {
+    markPaidMutation.mutate(transaction.id, {
+      onSuccess: () => {
+        notifications.show({
+          color: "accent",
+          title: "Transação atualizada",
+          message: "Transação marcada como paga.",
+        });
+      },
+      onError: (error: unknown) => {
+        notifications.show({
+          color: "danger",
+          title: "Erro",
+          message: getErrorMessage(error, "Não foi possível marcar a transação como paga."),
+        });
+      },
+    });
+  }
+
+  const columns: DataTableColumn<FinancialTransaction>[] = [
+    {
+      key: "type",
+      header: "Tipo",
+      render: (row) => (
+        <Badge color={row.type === "receivable" ? "accent" : "danger"} variant="light">
+          {row.type === "receivable" ? "Receita" : "Despesa"}
+        </Badge>
+      ),
+    },
+    {
+      key: "amount",
+      header: "Valor",
+      render: (row) => (
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5 }}>
+          {formatCurrencyBRL(row.amount)}
+        </span>
+      ),
+    },
+    {
+      key: "dueDate",
+      header: "Vencimento",
+      render: (row) => (
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5 }}>
+          {row.dueDate ? formatDate(row.dueDate) : "-"}
+        </span>
+      ),
+    },
+    {
+      key: "paidAt",
+      header: "Status",
+      render: (row) => (
+        <Badge color={row.paidAt ? "accent" : "gray"} variant="light">
+          {row.paidAt ? "Pago" : "Pendente"}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Ações",
+      render: (row) => (
+        <Group gap={4}>
+          <ActionIcon color="gray" variant="subtle" aria-label="Visualizar" onClick={() => setViewingTransaction(row)}>
+            <IconEye size={16} />
+          </ActionIcon>
+          <ActionIcon color="accent" variant="subtle" aria-label="Editar" onClick={() => setEditingTransaction(row)}>
+            <IconPencil size={16} />
+          </ActionIcon>
+          {!row.paidAt && (
+            <ActionIcon
+              color="accent"
+              variant="subtle"
+              aria-label="Marcar como pago"
+              onClick={() => handleMarkPaid(row)}
+              loading={markPaidMutation.isPending && markPaidMutation.variables === row.id}
+            >
+              <IconCheck size={16} />
+            </ActionIcon>
+          )}
+          <ActionIcon
+            color="danger"
+            variant="subtle"
+            aria-label="Excluir"
+            onClick={() => handleDelete(row)}
+            loading={deleteMutation.isPending && deleteMutation.variables === row.id}
+          >
+            <IconTrash size={16} />
+          </ActionIcon>
+        </Group>
+      ),
+    },
+  ];
 
   return (
     <div>
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" mb="md">
         <Panel>
           <Text style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-            Entradas do mês
+            Entradas (pagas)
           </Text>
           <Text style={{ fontSize: 24, fontWeight: 600, color: "var(--accent)", marginTop: 6 }}>
             {formatCurrencyBRL(entradas)}
@@ -47,7 +175,7 @@ export default function FinancialPage() {
         </Panel>
         <Panel>
           <Text style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-            Saídas do mês (peças, contas)
+            Saídas (pagas)
           </Text>
           <Text style={{ fontSize: 24, fontWeight: 600, color: "var(--danger)", marginTop: 6 }}>
             {formatCurrencyBRL(saidas)}
@@ -63,116 +191,104 @@ export default function FinancialPage() {
         </Panel>
       </SimpleGrid>
 
-      <Panel style={{ marginBottom: 16 }}>
-        <Text style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>
-          Custo de peças consumidas em conserto (por O.S.)
-        </Text>
+      <Group justify="flex-end" mb="md">
+        <Button color="accent" onClick={() => setModalOpen(true)}>
+          Nova transação
+        </Button>
+      </Group>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1.6fr 1fr 1fr 1fr",
-            gap: 8,
-            fontSize: 11.5,
-            fontFamily: "var(--font-mono)",
-            color: "var(--text-muted-dark)",
-            paddingBottom: 8,
-            borderBottom: "1px solid rgba(255,255,255,0.05)",
+      <DataTable<FinancialTransaction>
+        data={transactions}
+        meta={data?.meta ?? { page: 1, perPage, total: 0, totalPages: 0 }}
+        onPageChange={setPage}
+        columns={columns}
+        emptyLabel={isLoading ? "Carregando..." : "Nenhuma transação financeira encontrada."}
+      />
+
+      <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title="Nova transação">
+        <FinancialTransactionForm
+          submitting={createMutation.isPending}
+          onSubmit={(values) => {
+            createMutation.mutate(
+              { ...values, dueDate: values.dueDate || undefined },
+              {
+                onSuccess: () => {
+                  setModalOpen(false);
+                  notifications.show({
+                    color: "accent",
+                    title: "Transação criada",
+                    message: "Transação cadastrada com sucesso.",
+                  });
+                },
+                onError: (error: unknown) => {
+                  notifications.show({
+                    color: "danger",
+                    title: "Erro",
+                    message: getErrorMessage(error, "Não foi possível criar a transação."),
+                  });
+                },
+              },
+            );
           }}
-        >
-          <span>PEÇA</span>
-          <span>UNID. USADAS</span>
-          <span>CUSTO UNIT.</span>
-          <span>CUSTO TOTAL</span>
-        </div>
+        />
+      </Modal>
 
-        {consumedParts.length === 0 ? (
-          <Text style={{ fontSize: 13, color: "var(--text-muted)", padding: "12px 0" }}>
-            Nenhuma peça consumida registrada.
-          </Text>
-        ) : (
-          consumedParts.map((part, index) => (
-            <div
-              key={part.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1.6fr 1fr 1fr 1fr",
-                gap: 8,
-                alignItems: "center",
-                padding: "10px 0",
-                borderBottom:
-                  index === consumedParts.length - 1 ? "none" : "1px solid rgba(255,255,255,0.05)",
-              }}
-            >
-              <Text style={{ fontSize: 13 }}>{part.name}</Text>
-              <Text style={{ fontSize: 12.5, fontFamily: "var(--font-mono)" }}>{part.unitsUsed}</Text>
-              <Text style={{ fontSize: 12.5, fontFamily: "var(--font-mono)" }}>
-                {formatCurrencyBRL(part.unitCost)}
-              </Text>
-              <Text style={{ fontSize: 12.5, fontFamily: "var(--font-mono)" }}>
-                {formatCurrencyBRL(part.totalCost)}
-              </Text>
-            </div>
-          ))
+      <Modal
+        opened={Boolean(editingTransaction)}
+        onClose={() => setEditingTransaction(null)}
+        title="Editar transação"
+      >
+        {editingTransaction && (
+          <FinancialTransactionForm
+            submitting={updateMutation.isPending}
+            initialValues={{
+              type: editingTransaction.type,
+              amount: editingTransaction.amount,
+              dueDate: editingTransaction.dueDate ?? "",
+            }}
+            onSubmit={(values) => {
+              updateMutation.mutate(
+                { id: editingTransaction.id, dto: { ...values, dueDate: values.dueDate || undefined } },
+                {
+                  onSuccess: () => {
+                    setEditingTransaction(null);
+                    notifications.show({
+                      color: "accent",
+                      title: "Transação atualizada",
+                      message: "As alterações foram salvas com sucesso.",
+                    });
+                  },
+                  onError: (error: unknown) => {
+                    notifications.show({
+                      color: "danger",
+                      title: "Erro",
+                      message: getErrorMessage(error, "Não foi possível atualizar a transação."),
+                    });
+                  },
+                },
+              );
+            }}
+          />
         )}
-      </Panel>
+      </Modal>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <Panel>
-          <Text style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Contas a pagar</Text>
-          {payables.length === 0 ? (
-            <Text style={{ fontSize: 13, color: "var(--text-muted)" }}>Nenhuma conta a pagar em aberto.</Text>
-          ) : (
-            payables.map((t, index) => (
-              <div
-                key={t.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "10px 0",
-                  borderBottom: index === payables.length - 1 ? "none" : "1px solid rgba(255,255,255,0.05)",
-                }}
-              >
-                <div>
-                  <Text style={{ fontSize: 13, fontWeight: 500 }}>{t.description}</Text>
-                  <Text style={{ fontSize: 11.5, color: "var(--text-muted)" }}>Vence em {formatDate(t.dueDate)}</Text>
-                </div>
-                <Text style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--danger)" }}>
-                  {formatCurrencyBRL(t.amount)}
-                </Text>
-              </div>
-            ))
-          )}
-        </Panel>
-
-        <Panel>
-          <Text style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Contas a receber</Text>
-          {receivables.length === 0 ? (
-            <Text style={{ fontSize: 13, color: "var(--text-muted)" }}>Nenhuma conta a receber em aberto.</Text>
-          ) : (
-            receivables.map((t, index) => (
-              <div
-                key={t.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "10px 0",
-                  borderBottom:
-                    index === receivables.length - 1 ? "none" : "1px solid rgba(255,255,255,0.05)",
-                }}
-              >
-                <div>
-                  <Text style={{ fontSize: 13, fontWeight: 500 }}>{t.description}</Text>
-                  <Text style={{ fontSize: 11.5, color: "var(--text-muted)" }}>Vence em {formatDate(t.dueDate)}</Text>
-                </div>
-                <Text style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--accent)" }}>
-                  {formatCurrencyBRL(t.amount)}
-                </Text>
-              </div>
-            ))
-          )}
-        </Panel>
-      </div>
+      <Modal
+        opened={Boolean(viewingTransaction)}
+        onClose={() => setViewingTransaction(null)}
+        title="Detalhes da transação"
+      >
+        {viewingTransaction && (
+          <FinancialTransactionForm
+            readOnly
+            initialValues={{
+              type: viewingTransaction.type,
+              amount: viewingTransaction.amount,
+              dueDate: viewingTransaction.dueDate ?? "",
+            }}
+            onSubmit={() => {}}
+          />
+        )}
+      </Modal>
     </div>
   );
 }
